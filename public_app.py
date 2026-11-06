@@ -189,6 +189,36 @@ def get_day_total(workouts, day):
     return total
 
 
+def build_week_overview_rows(workouts):
+    """One row per day, showing distinct group practice types and total daily yards."""
+    rows = []
+    for day in DAYS:
+        day_workouts = [w for w in workouts if w.get("day_of_week") == day]
+        if not day_workouts:
+            practice_type = "Not entered"
+        elif all(w.get("is_no_practice") for w in day_workouts):
+            practice_type = "No Practice"
+        else:
+            types = set()
+            for workout in day_workouts:
+                if workout.get("is_no_practice"):
+                    continue
+                for entry in get_group_entries(workout):
+                    types.add(entry.get("practice_type") or "Not specified")
+            practice_type = ", ".join(sorted(types)) if types else "Not specified"
+        rows.append({
+            "Day": day,
+            "Practice Type": practice_type,
+            "Total Yards": get_day_total(workouts, day),
+        })
+    rows.append({
+        "Day": "Weekly total",
+        "Practice Type": "",
+        "Total Yards": sum(get_day_total(workouts, day) for day in DAYS),
+    })
+    return pd.DataFrame(rows)
+
+
 def get_week_group_totals(workouts):
     totals = {}
     for workout in workouts:
@@ -287,6 +317,34 @@ else:
     st.info("Weekly yardage will appear as practices are added.")
 
 
+# Current calendar week's daily overview, directly below the season chart.
+today = date.today()
+current_week = next(
+    (
+        week for week in weeks
+        if date.fromisoformat(week["start_date"]) <= today
+        <= date.fromisoformat(week["end_date"])
+    ),
+    None,
+)
+if current_week is not None:
+    current_number = int(current_week["week_number"])
+    current_workouts = [
+        workout for workout in all_workouts
+        if int(workout.get("week_number", -1)) == current_number
+    ]
+    st.markdown("### Current weekly overview")
+    st.caption(f"Week {current_number} · {format_week_dates(current_week)}")
+    st.dataframe(
+        build_week_overview_rows(current_workouts),
+        use_container_width=True,
+        hide_index=True,
+        column_config={"Total Yards": st.column_config.NumberColumn("Total Yards", format="%d")},
+    )
+else:
+    st.caption("The current date falls outside the tracked swim season.")
+
+
 # ---------------------------------------------------------
 # Weekly practice tracker
 # ---------------------------------------------------------
@@ -308,30 +366,13 @@ week_workouts = [
 st.markdown(f"### Week {selected_week_number}")
 st.caption(format_week_dates(selected_week))
 
-# Weekly overview table: day and combined yardage
-daily_rows = [
-    {"Day": day, "Total Yards": get_day_total(week_workouts, day)}
-    for day in DAYS
-]
-daily_rows.append(
-    {
-        "Day": "Weekly total",
-        "Total Yards": sum(row["Total Yards"] for row in daily_rows),
-    }
-)
-daily_df = pd.DataFrame(daily_rows)
-
+# Weekly overview summarizes distinct practice types without listing training groups.
 st.markdown("#### Weekly overview")
 st.dataframe(
-    daily_df,
+    build_week_overview_rows(week_workouts),
     use_container_width=True,
     hide_index=True,
-    column_config={
-        "Day": st.column_config.TextColumn("Day"),
-        "Total Yards": st.column_config.NumberColumn(
-            "Total Yards", format="%d"
-        ),
-    },
+    column_config={"Total Yards": st.column_config.NumberColumn("Total Yards", format="%d")},
 )
 
 # Weekly group totals

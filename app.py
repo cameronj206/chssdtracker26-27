@@ -25,7 +25,7 @@ st.set_page_config(
 )
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-PRACTICE_TYPES = ["Not specified", "Kick", "Stroke/IM", "Sprint", "Distance", "Recovery"]
+PRACTICE_TYPES = ["Not specified", "Kick", "Stroke/IM", "Sprint", "Distance", "Recovery", "General", "Free"]
 YARDAGE_FIELDS = [
     ("warmup_yardage", "Warm-up"),
     ("kick_yardage", "Kick"),
