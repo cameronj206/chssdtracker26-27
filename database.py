@@ -79,6 +79,7 @@ def create_workout(
     description,
     general_notes,
     group_values,
+    is_no_practice=False,
 ):
     client = get_client()
     workout_response = (
@@ -92,6 +93,7 @@ def create_workout(
             "session_name": session_name,
             "workout_description": description,
             "general_notes": general_notes,
+            "is_no_practice": bool(is_no_practice),
         })
         .execute()
     )
@@ -105,6 +107,7 @@ def create_workout(
             "group_id": item["group_id"],
             "total_yardage": int(item.get("total_yardage", 0)),
             "duration_minutes": int(item.get("duration_minutes", 0)),
+            "practice_type": item.get("practice_type"),
         }
         for item in group_values
     ]

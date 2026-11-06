@@ -25,6 +25,7 @@ st.set_page_config(
 )
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+PRACTICE_TYPES = ["Not specified", "Kick", "Stroke/IM", "Sprint", "Distance", "Recovery"]
 YARDAGE_FIELDS = [
     ("warmup_yardage", "Warm-up"),
     ("kick_yardage", "Kick"),
@@ -159,6 +160,13 @@ def render_group_entry(workout, entry, all_groups):
                         value=as_int(entry.get(field)),
                         key=f"{field}_{entry['id']}",
                     )
+            practice_type = st.selectbox(
+                "Practice type",
+                PRACTICE_TYPES,
+                index=PRACTICE_TYPES.index(entry.get("practice_type") or "Not specified")
+                if (entry.get("practice_type") or "Not specified") in PRACTICE_TYPES else 0,
+                key=f"practice_type_{entry['id']}",
+            )
             group_notes = st.text_area(
                 "Group-specific notes",
                 value=entry.get("group_notes") or "",
@@ -171,6 +179,7 @@ def render_group_entry(workout, entry, all_groups):
                     "duration_minutes": int(duration),
                     **{k: int(v) for k, v in field_values.items()},
                     "group_notes": group_notes,
+                    "practice_type": None if practice_type == "Not specified" else practice_type,
                 }
                 save_group_entry(
                     workout_id=workout["id"],
@@ -192,6 +201,16 @@ def render_workout(workout, groups):
     when = workout.get("practice_date", "")
     with st.container(border=True):
         st.subheader(f"{session} · {when}")
+        if workout.get("is_no_practice"):
+            st.info("No Practice")
+            with st.expander("Change No Practice status"):
+                if st.button("Restore as a practice", key=f"restore_{workout['id']}"):
+                    update_workout(workout["id"], {"is_no_practice": False})
+                    st.rerun()
+            if st.button("Delete No Practice entry", key=f"delete_no_practice_{workout['id']}"):
+                delete_workout(workout["id"])
+                st.rerun()
+            return
         entries = workout.get("group_workout_entries") or []
         if entries:
             for entry in entries:
@@ -214,6 +233,7 @@ def render_workout(workout, groups):
                     chosen_name = st.selectbox("Training group", list(group_options))
                     new_total = st.number_input("Total yardage", min_value=0, step=100)
                     new_duration = st.number_input("Duration (minutes)", min_value=0, step=5)
+                    new_type = st.selectbox("Practice type", PRACTICE_TYPES)
                     add = st.form_submit_button("Add group")
                     if add:
                         save_group_entry(
@@ -222,6 +242,7 @@ def render_workout(workout, groups):
                             values={
                                 "total_yardage": int(new_total),
                                 "duration_minutes": int(new_duration),
+                                "practice_type": None if new_type == "Not specified" else new_type,
                             },
                         )
                         st.success("Training group added.")
@@ -242,6 +263,7 @@ def render_workout(workout, groups):
                     "General notes",
                     value=workout.get("general_notes") or "",
                 )
+                no_practice_edit = st.checkbox("No Practice", value=bool(workout.get("is_no_practice")))
                 save = st.form_submit_button("Save workout details")
                 if save:
                     update_workout(
@@ -250,6 +272,7 @@ def render_workout(workout, groups):
                             "session_name": session_name.strip() or "Practice",
                             "workout_description": description,
                             "general_notes": notes,
+                            "is_no_practice": no_practice_edit,
                         },
                     )
                     st.success("Workout updated.")
@@ -287,6 +310,7 @@ def render_day(day, day_index, week_row, groups, workouts):
         group_lookup = {g["group_name"]: g["id"] for g in groups}
         yardages = {}
         durations = {}
+        practice_types = {}
 
         with st.form(f"new_workout_{week_row['week_number']}_{day}"):
             practice_date = st.date_input(
@@ -306,10 +330,11 @@ def render_day(day, day_index, week_row, groups, workouts):
                 help="Enter the workout once here. It can be assigned to multiple groups.",
             )
             general_notes = st.text_area("General notes")
+            no_practice = st.checkbox("No Practice (entire day)", key=f"no_practice_{week_row['week_number']}_{day}")
             if selected_names:
                 st.markdown("**Group-specific totals**")
                 for name in selected_names:
-                    c1, c2 = st.columns(2)
+                    c1, c2, c3 = st.columns(3)
                     with c1:
                         yardages[name] = st.number_input(
                             f"{name} total yardage",
@@ -324,20 +349,26 @@ def render_day(day, day_index, week_row, groups, workouts):
                             step=5,
                             key=f"new_duration_{week_row['week_number']}_{day}_{name}",
                         )
-            submitted = st.form_submit_button("Create practice", type="primary")
+                    with c3:
+                        practice_types[name] = st.selectbox(
+                            f"{name} practice type", PRACTICE_TYPES,
+                            key=f"new_type_{week_row['week_number']}_{day}_{name}",
+                        )
+            submitted = st.form_submit_button("Create practice / mark No Practice", type="primary")
             if submitted:
                 if practice_date.weekday() != day_index:
                     st.error(f"Please select a date that falls on {day}.")
-                elif not selected_names:
+                elif not selected_names and not no_practice:
                     st.error("Select at least one training group.")
                 else:
                     group_values = [
                         {
                             "group_id": group_lookup[name],
                             "total_yardage": int(yardages[name]),
-                            "duration_minutes": int(durations[name]),
+                            "duration_minutes": 0 if no_practice else int(durations[name]),
+                            "practice_type": None if no_practice or practice_types[name] == "Not specified" else practice_types[name],
                         }
-                        for name in selected_names
+                        for name in ([] if no_practice else selected_names)
                     ]
                     create_workout(
                         week_number=week_row["week_number"],
@@ -347,6 +378,7 @@ def render_day(day, day_index, week_row, groups, workouts):
                         description=description,
                         general_notes=general_notes,
                         group_values=group_values,
+                        is_no_practice=no_practice,
                     )
                     st.success("Practice created.")
                     st.rerun()

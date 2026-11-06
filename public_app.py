@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 import pandas as pd
 import streamlit as st
 from supabase import create_client
@@ -8,7 +9,7 @@ from supabase import create_client
 # Page setup and visual design
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="CHSSD Swim Practice Tracker",
+    page_title="Carrboro High School Swim Practice Tracker",
     page_icon="🏊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -125,10 +126,12 @@ def load_public_data():
             day_of_week,
             session_name,
             workout_description,
+            is_no_practice,
             group_workout_entries (
                 id,
                 total_yardage,
                 duration_minutes,
+                practice_type,
                 training_groups (
                     id,
                     group_name
@@ -200,7 +203,13 @@ def get_week_group_totals(workouts):
 # ---------------------------------------------------------
 # Header
 # ---------------------------------------------------------
-st.title("🏊 CHSSD Swim Practice Tracker")
+logo_path = Path(__file__).with_name("logo_outline.webp")
+header_logo, header_title = st.columns([1, 8], vertical_alignment="center")
+with header_logo:
+    if logo_path.exists():
+        st.image(str(logo_path), use_container_width=True)
+with header_title:
+    st.title("Carrboro High School Swim Practice Tracker")
 st.markdown(
     '<p class="site-subtitle">2026–2027 Season · Weekly Training Log</p>',
     unsafe_allow_html=True,
@@ -240,12 +249,11 @@ season_yards = sum(
     for workout in all_workouts
     for entry in get_group_entries(workout)
 )
-season_sessions = len(all_workouts)
+season_sessions = sum(not w.get("is_no_practice", False) for w in all_workouts)
 
-metric1, metric2, metric3 = st.columns(3)
+metric1, metric2 = st.columns(2)
 metric1.metric("Season yardage", f"{season_yards:,}")
 metric2.metric("Practice sessions", f"{season_sessions:,}")
-metric3.metric("Training groups", f"{len(groups):,}")
 
 weekly_totals = []
 for week in weeks:
@@ -357,9 +365,15 @@ for tab, day in zip(day_tabs, DAYS):
             st.info(f"No {day} practices have been published yet.")
             continue
 
+        if all(w.get("is_no_practice") for w in day_workouts):
+            st.info("No Practice")
+            continue
         st.metric(f"{day} total yardage", f"{get_day_total(week_workouts, day):,}")
 
         for workout in day_workouts:
+            if workout.get("is_no_practice"):
+                st.info("No Practice")
+                continue
             session_name = workout.get("session_name") or "Practice"
             practice_date = workout.get("practice_date") or ""
             description = workout.get("workout_description") or ""
@@ -382,6 +396,7 @@ for tab, day in zip(day_tabs, DAYS):
                         entry_rows.append(
                             {
                                 "Training Group": get_entry_group_name(entry),
+                                "Practice Type": entry.get("practice_type") or "Not specified",
                                 "Total Yards": as_int(entry.get("total_yardage")),
                                 "Duration (minutes)": as_int(
                                     entry.get("duration_minutes")
@@ -408,5 +423,5 @@ for tab, day in zip(day_tabs, DAYS):
 
 st.markdown('<hr class="gold-rule">', unsafe_allow_html=True)
 st.caption(
-    "CHSSD Swim Season Tracker · Public, read-only practice information"
+    "Carrboro High School Swim Practice Tracker · Public, read-only practice information"
 )
