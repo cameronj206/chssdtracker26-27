@@ -1,3 +1,4 @@
+from meet_results import render_private
 import io
 from pathlib import Path
 from datetime import date, datetime, timedelta
@@ -504,7 +505,7 @@ def main():
 
     require_password()
 
-    practice_tab, schedule_tab = st.tabs(["Practice Log", "Schedule"])
+    practice_tab, schedule_tab, meet_tab = st.tabs(["Practice Log", "Schedule", "Meet Results"])
     with practice_tab:
         try:
             client = get_client()
@@ -626,6 +627,9 @@ def main():
 
     with schedule_tab:
         render_schedule()
+
+    with meet_tab:
+        render_private(get_client())
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,4 @@
+from meet_public import render_public
 from datetime import date
 from pathlib import Path
 import pandas as pd
@@ -274,7 +275,7 @@ st.markdown(
 st.markdown('<hr class="gold-rule">', unsafe_allow_html=True)
 
 
-practice_tab, schedule_tab = st.tabs(["Practice Log", "Schedule"])
+practice_tab, schedule_tab, meet_tab = st.tabs(["Practice Log", "Schedule", "Meet Results"])
 
 with practice_tab:
     # ---------------------------------------------------------
@@ -475,3 +476,6 @@ with practice_tab:
 
 with schedule_tab:
     render_schedule()
+
+with meet_tab:
+    render_public(get_public_client())
