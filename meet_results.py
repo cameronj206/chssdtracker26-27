@@ -100,6 +100,20 @@ def render_private(client):
     choices=['+ New result']+[f"Edit #{r['id']}: {r.get('relay_name') or names.get(r.get('swimmer_id'),'Unknown')}" for r in existing]
     selected=st.selectbox('New or edit existing result',range(len(choices)),format_func=lambda i:choices[i])
     old=existing[selected-1] if selected else None
+    if old is not None:
+        # Deleting the parent result cascades to its splits and relay legs.
+        # Require explicit confirmation to prevent accidental removal.
+        with st.expander('Delete selected relay' if relay else 'Delete selected individual result'):
+            entry_label = old.get('relay_name') or names.get(old.get('swimmer_id'), 'Unknown swimmer')
+            st.warning(f"This permanently deletes {entry_label}'s {event} result from {meet['name']}, including recorded splits" + (' and relay legs.' if relay else '.'))
+            confirmed = st.checkbox('I understand this result will be permanently deleted', key=f"confirm_delete_result_{old['id']}")
+            if st.button('Delete relay' if relay else 'Delete individual result', type='primary', disabled=not confirmed, key=f"delete_result_{old['id']}"):
+                try:
+                    client.table('swim_results').delete().eq('id', old['id']).eq('meet_id', meet['id']).execute()
+                    st.success('Result deleted. The swimmer roster was not changed.')
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f'Could not delete result: {exc}')
     old_splits=fetch(client,'meet_splits','distance_yards,cumulative_seconds,split_seconds',result_id=old['id']) if old else []
     split_by_distance={s['distance_yards']:s for s in old_splits}
     old_legs=fetch(client,'swim_relay_legs','leg_number,swimmer_id',result_id=old['id']) if old and relay else []
