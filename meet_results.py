@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 import pandas as pd
 import streamlit as st
+from meet_public import render_results
 
 EVENTS = [('200 Medley Relay',200,True),('200 Freestyle',200,False),('200 IM',200,False),('50 Freestyle',50,False),('Diving',0,False),('100 Butterfly',100,False),('100 Freestyle',100,False),('500 Freestyle',500,False),('200 Freestyle Relay',200,True),('100 Backstroke',100,False),('100 Breaststroke',100,False),('400 Freestyle Relay',400,True)]
 STATUS = ['Official','Exhibition','DQ','Scratch','No time']
@@ -88,6 +89,10 @@ def render_private(client):
         try:
             client.table('swim_meets').update({'is_published':publish}).eq('id',meet['id']).execute(); st.rerun()
         except Exception as exc: st.error(f'Could not update publication: {exc}')
+    st.markdown('### Browse meet results')
+    render_results(client, meet=meet, public=False, key_prefix='coach_results')
+    st.divider()
+    st.markdown('### Enter, edit or delete results')
     division=st.radio('Division',['Women','Men'],horizontal=True)
     event=st.selectbox('Event',[e[0] for e in EVENTS])
     distance,relay=next((d,r) for n,d,r in EVENTS if n==event)
